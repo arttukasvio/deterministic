@@ -28,6 +28,7 @@ Issues
 ------
 
 1. Is my deterministic random number generator cryptographically secure?
+   Evidence in favor: the method used is also used in the python ecdsa.util.PRNG.
 2. Is PyCrypto's RSA key generation correct?
 
 Future

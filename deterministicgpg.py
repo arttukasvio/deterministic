@@ -16,7 +16,10 @@ import subprocess
 from Crypto.PublicKey import RSA
 
 class DeterministicRandom(object):
-  """ Lame, probably unsafe deterministic "random" generator
+  """ Deterministic "random" generator.  May not be best method, but
+        ... seems to be same basic procedure as used in python-ecdsa util.PRNG
+        https://github.com/trezor/python-ecdsa/blob/master/ecdsa/util.py
+        
       Somewhat inspired by: http://blog.cr.yp.to/20140205-entropy.html
       Some code from: https://github.com/dlitz/pycrypto/blob/master/lib/Crypto/Random/_UserFriendlyRNG.py
   """
