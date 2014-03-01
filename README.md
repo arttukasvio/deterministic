@@ -1,5 +1,5 @@
-deterministic
-=============
+Deterministic GPG brainwallet
+=============================
 
 Deterministic GPG key creation.  Idea prompted by [electrum](https://electrum.org/)
 and DJB's blog [Entropy Attacks](http://blog.cr.yp.to/20140205-entropy.html).
@@ -13,7 +13,7 @@ Requirements
 ------------
 
 * [GPG](http://gnupg.org)
-* [Electrum](https://electrum.org)
+* [Electrum](https://electrum.org) (optional)
 * [MonkeySphere](http://web.monkeysphere.info/)
 * [PyCrypto](https://www.dlitz.net/software/pycrypto/)
 
@@ -22,7 +22,7 @@ How to use
 
     python deterministicgpg.py
 
-Then enter Name, Email, and electrum style seed.
+Then enter Name, Email, and passphrase or Electrum seed.
 
 Issues
 ------
@@ -39,4 +39,3 @@ Future
 * Non-RSA keys?
 * Set trust on generated gpg keys
 * Anything else we should deterministically generate? Bit-message IDs?
-* 

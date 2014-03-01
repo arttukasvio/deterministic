@@ -6,7 +6,8 @@
 # This is free and unencumbered software released into the public domain.
 # See LICENSE for more info and refer to <http://unlicense.org>
 
-# Requirements: electrum, pycrypto, monkeysphere, gpg
+# Requirements: pycrypto, monkeysphere, gpg
+#   Electrum optional
 
 import os
 import getpass
@@ -56,6 +57,24 @@ class DeterministicRandom(object):
 
     return retval
 
+def create_gpg_key(user_id, seed):
+  
+  rand = DeterministicRandom(seed)
+
+  key = RSA.generate(4096, rand.read)
+
+  # Since we're auto-generating the key default the creation time to UNIX time 0
+  os.environ['PEM2OPENPGP_TIMESTAMP'] = '0'
+
+  #pem2openpgp "Foo Bar <fbar@linux.net>" < priv.pem | gpg --import
+  pem2openpgp = subprocess.Popen(['pem2openpgp', user_id],
+      stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+  gpg_id = pem2openpgp.communicate(key.exportKey(pkcs=1))[0]
+
+  gpg_import = subprocess.Popen(['gpg', '--import'], stdin=subprocess.PIPE)
+  gpg_import.communicate(gpg_id)
+
+	
 if __name__ == '__main__':
   import sys
   if(len(sys.argv) == 2 and sys.argv[1] == 'randomtest'):
@@ -80,25 +99,22 @@ if __name__ == '__main__':
   # get name/email for GPG id
   name = raw_input('Name: ')
   email= raw_input('Email: ')
+  user_id = '%s <%s>' % (name, email)
 
-  # Example seeds for test:
+  # Example electrum seeds for test:
   #   action draw bit shove single however shore language visit wonderful swell pale
   #   motion shut tool sadness focus scratch wash match torture tightly situation jump
-  seed = getpass.getpass(prompt="Seed: ", stream=None)
-  seed = electrum.mnemonic_decode(seed.split())
-
-  rand = DeterministicRandom(seed)
-
-  key = RSA.generate(4096, rand.read)
-
-  # Since we're auto-generating the key default the creation time to UNIX time 0
-  os.environ['PEM2OPENPGP_TIMESTAMP'] = '0'
-
-  #pem2openpgp "Foo Bar <fbar@linux.net>" < priv.pem | gpg --import
-  pem2openpgp = subprocess.Popen(['pem2openpgp', '%s <%s>' % (name, email)],
-      stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-  gpg_id = pem2openpgp.communicate(key.exportKey(pkcs=1))[0]
-
-  gpg_import = subprocess.Popen(['gpg', '--import'], stdin=subprocess.PIPE)
-  gpg_import.communicate(gpg_id)
+  seed = getpass.getpass(prompt="Passphrase or Electrum seed: ", stream=None)
+  if len(seed.split()) == 12:
+    try:
+      import electrum
+      seed = electrum.mnemonic_decode(seed.split())
+    except ImportError:
+      print 'Could not import electrum to parse 12 word electrum seed.'
+      print "Install electrum or use a passphrase that isn't 12 words long."
+      print
+      raise
+  #else we treat whatever was typed as a passphrase
+        
+  create_gpg_key(user_id, seed)
 
