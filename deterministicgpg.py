@@ -47,7 +47,7 @@ class DeterministicRandom(object):
 
     # Create the "random" data
     while len(self.data) < N:
-      self.data += hashlib.sha512(seed + str(self.iteration)).digest()
+      self.data += hashlib.sha512(self.seed + str(self.iteration)).digest()
       self.iteration += 1
 
     retval = self.data[:N]
@@ -57,6 +57,26 @@ class DeterministicRandom(object):
     return retval
 
 if __name__ == '__main__':
+  import sys
+  if(len(sys.argv) == 2 and sys.argv[1] == 'randomtest'):
+    rand = DeterministicRandom("2")
+    xpm = open('rand.xpm', 'w')
+    xpm.write('! XPM2\n')
+    xpm.write('1024 1024 2 1\n')
+    xpm.write('a c #FFFFFF\n')
+    xpm.write('b c #000000\n')
+    for i in range(1024):
+      for j in range(1024/8): # 8 bits/byte
+        byte = ord(rand.read(1))
+        for k in range(8):
+          if (byte >> k) & 1:
+            xpm.write('a')
+          else:
+            xpm.write('b')
+      xpm.write('\n')
+    xpm.close()
+    sys.exit(0)
+          
   # get name/email for GPG id
   name = raw_input('Name: ')
   email= raw_input('Email: ')
