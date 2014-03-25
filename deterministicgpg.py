@@ -16,6 +16,8 @@ import electrum
 import subprocess
 from Crypto.PublicKey import RSA
 
+import plugin
+
 class DeterministicRandom(object):
   """ Deterministic "random" generator.  May not be best method, but
         ... seems to be same basic procedure as used in python-ecdsa util.PRNG
@@ -73,6 +75,17 @@ def create_gpg_key(user_id, seed):
 
   gpg_import = subprocess.Popen(['gpg', '--import'], stdin=subprocess.PIPE)
   gpg_import.communicate(gpg_id)
+
+class Plugin(plugin.Plugin):
+  def __init__(self):
+    plugin.Plugin.__init__(self, 'GPG private/public keys',
+        'Generates a 4096 bit RSA private/public key using a deterministic random number generator seeded from your electrum passphrase.')
+    self.name = plugin.StringField('name', 'Name:', 'Typically <First Last>')
+    self.email = plugin.StringField('email', 'Email:', '')
+    self.fields = [self.name, self.email]
+
+  def doit(self, seed):
+    create_gpg_key('"%s" <%s>' % (self.name, self.email), seed)
 
 	
 if __name__ == '__main__':

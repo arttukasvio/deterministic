@@ -1,19 +1,20 @@
 #!/usr/bin/env python
-from gi.repository import Gtk
+import sys
 import electrum
+from gi.repository import Gtk
+
+import plugin
+import deterministicgpg
 
 class PassphraseWidget(Gtk.Grid):
   def __init__(self):
     Gtk.Grid.__init__(self)
+    self.set_vexpand(False)
 
     # passphrase field
     self.passphrase = Gtk.Entry(visibility=True, expand=True)
-    self.passphrase.connect('cut-clipboard', self.validate)
-    self.passphrase.connect('delete-from-cursor', self.validate)
-    self.passphrase.connect('insert-at-cursor', self.validate)
-    self.passphrase.connect('paste-clipboard', self.validate)
-    self.passphrase.get_buffer().connect('deleted-text', self.validate)
-    self.passphrase.get_buffer().connect('inserted-text', self.validate)
+    self.passphrase.props.margin_bottom = 6
+    self.passphrase.connect('changed', self.validate)
     self.attach(self.passphrase, 0, 0, 1, 1)
 
     # show/hide passphrase
@@ -34,7 +35,7 @@ class PassphraseWidget(Gtk.Grid):
     print button
 
   def showhide(self, *args):
-    if(self.showhide_w.get_active()):
+    if self.showhide_w.get_active():
       self.passphrase.set_visibility(True)
     else:
       self.passphrase.set_visibility(False)
@@ -64,32 +65,122 @@ class PassphraseWidget(Gtk.Grid):
       self.passphrase.set_icon_from_icon_name(Gtk.EntryIconPosition.SECONDARY, None)
     #print ('> "%s"' % text), len(text.split()), frac, args
 
-class MyWindow(Gtk.Window):
+
+class PluginRow(Gtk.Box):
+  def __init__(self, plugin):
+    Gtk.Box.__init__(self, orientation=Gtk.Orientation.HORIZONTAL)
+    self.plugin = plugin
+    self.props.margin_bottom = 12
+    #label.props.halign = Gtk.Align.START
+
+    # switch and expander
+    self.switch = Gtk.Switch()
+    self.pack_start(self.switch, False, False, 0)
+    self.switch.connect('notify::active', self.on_off)
+    self.expander = Gtk.Expander()
+    self.pack_start(self.expander, True, True, 0)
+
+    # header
+    self.expander.set_label('<b>%s</b>' % self.plugin.title)
+    self.expander.set_use_markup(True)
+
+    # plugin
+    self.box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+    self.expander.add(self.box)
+
+    # description
+    label = Gtk.Label()
+    label.set_line_wrap(True)
+    label.set_markup('<small>%s</small>' % self.plugin.description)
+    label.set_justify(Gtk.Justification.LEFT)
+    label.props.halign = Gtk.Align.START
+    label.props.xalign = 0
+    label.props.margin_bottom = 6
+    self.box.add(label)
+
+    # plugin fields don't get done unless the switch gets flipped
+    self.plugin_gui = False
+
+  def create_plugin_gui(self):
+    grid = Gtk.Grid()
+    for i, field in enumerate(self.plugin.fields):
+      entry = field.generate_widget()
+
+      # make a label for our new widget 
+      label = Gtk.Label(field.gui_label)
+      label.props.margin_right = 12
+      label.props.margin_left = 12
+      label.props.halign = Gtk.Align.START
+      grid.attach(label, 0, i, 1, 1)
+      grid.attach(entry, 1, i, 1, 1)
+    self.box.add(grid)
+    self.box.show_all()
+
+  def on_off(self, *args):
+    if self.switch.get_active():
+      if not self.plugin_gui: # create the plugin GUI
+        self.create_plugin_gui()
+        self.plugin_gui = True
+      # XXX set focus to first field!
+      self.expander.set_expanded(True)
+    else:
+      self.expander.set_expanded(False)
+
+
+plugins = [deterministicgpg.Plugin(),
+    plugin.Plugin("Bar", "Some longer descriptions that is multiple lines.\nSecond line ..."),
+    plugin.Plugin('Foo Bar Baz', 'A description <b>with</b> markup, line wrapping, and even a <a href="http://google.com">hyperlink</a>!  Wow!'),
+    ]
+
+class MainWindow(Gtk.Window):
   def __init__(self):
     Gtk.Window.__init__(self, title="Deterministic ID")
     
     vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+    vbox.props.margin = 12
     self.add(vbox)
 
     # Add label describing what to do
-    vbox.pack_start(Gtk.Label("Enter electrum seed:"),
-        False, False, 0)
+    label = Gtk.Label("<b>Enter electrum seed:</b>", use_markup=True)
+    label.props.halign = Gtk.Align.START
+    label.props.valign = Gtk.Align.START
+    label.props.vexpand = False
+    vbox.pack_start(label, False, False, 0)
 
     # add ID passphrase entry (with options show passphrase, generate new ID)
-    vbox.pack_start(PassphraseWidget(), False, False, 0)
+    pw = PassphraseWidget()
+    pw.props.valign = Gtk.Align.START
+    vbox.pack_start(pw, False, False, 0)
 
     # add ListBox which contains children rows one per plugin with switch to enable/disable
+    list_label = Gtk.Label("<b>Select types of IDs to generate</b>", use_markup=True)
+    list_label.props.margin_top = 12
+    list_label.props.margin_bottom = 6
+    list_label.props.halign = Gtk.Align.START
+    list_label.props.valign = Gtk.Align.START
+    list_label.props.vexpand = False
+    vbox.pack_start(list_label, False, False, 0)
+    listbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+    listbox.props.margin_bottom = 6
+    listbox.props.valign = Gtk.Align.START
+    vbox.pack_start(listbox, True, True, 0)
+
+    for plugin in plugins:
+      pr = PluginRow(plugin)
+      pr.props.valign = Gtk.Align.START
+      listbox.add(pr)
 
     # add button to create ID for all checked plugins
 
     self.button = Gtk.Button(label="Generate!")
+    self.button.valign = Gtk.Align.END
     #self.button.connect("clicked", self.generate?)
     vbox.pack_start(self.button, True, True, 0)
 
   def generate(self, widget):
     print("Stuff ...")
 
-win = MyWindow()
+win = MainWindow()
 win.connect("delete-event", Gtk.main_quit)
 win.show_all()
 Gtk.main()
