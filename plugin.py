@@ -15,6 +15,7 @@ class Field(object):
 class StringField(Field):
   def generate_widget(self):
     entry = Gtk.Entry()
+    entry.set_tooltip_markup(self.tip)
     def handle(*args):
       text = entry.get_text()
       if self.validate(text):
@@ -33,6 +34,7 @@ class UIntField(Field):
 
   def generate_widget(self):
     entry = Gtk.SpinButton()
+    entry.set_tooltip_markup(self.tip)
     entry.set_numeric(True)
     entry.set_adjustment(Gtk.Adjustment(0, 0, sys.maxint, 1, 100, 0))
     entry.set_update_policy(Gtk.SpinButtonUpdatePolicy.IF_VALID)
@@ -49,4 +51,6 @@ class Plugin(object):
     self.fields = [StringField('so', 'Foo Var:', 'a tip')]
 
   def doit(self, seed): pass
+
+  def valid(self): return True
 

@@ -7,7 +7,6 @@
 # See LICENSE for more info and refer to <http://unlicense.org>
 
 # Requirements: pycrypto, monkeysphere, gpg
-#   Electrum optional
 
 import os
 import getpass
@@ -80,12 +79,12 @@ class Plugin(plugin.Plugin):
   def __init__(self):
     plugin.Plugin.__init__(self, 'GPG private/public keys',
         'Generates a 4096 bit RSA private/public key using a deterministic random number generator seeded from your electrum passphrase.')
-    self.name = plugin.StringField('name', 'Name:', 'Typically <First Last>')
-    self.email = plugin.StringField('email', 'Email:', '')
+    self.name = plugin.StringField('name', 'Name:', 'Typically "First Last"')
+    self.email = plugin.StringField('email', 'Email:', 'name@server.domain\n<i>(name will be automatically prepended)</i>')
     self.fields = [self.name, self.email]
 
   def doit(self, seed):
-    create_gpg_key('"%s" <%s>' % (self.name, self.email), seed)
+    create_gpg_key('"%s" <%s>' % (self.name.value, self.email.value), seed)
 
 	
 if __name__ == '__main__':

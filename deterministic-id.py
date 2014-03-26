@@ -63,7 +63,14 @@ class PassphraseWidget(Gtk.Grid):
       self.passphrase.set_icon_from_icon_name(Gtk.EntryIconPosition.SECONDARY, 'gtk-yes')
     elif not bad:
       self.passphrase.set_icon_from_icon_name(Gtk.EntryIconPosition.SECONDARY, None)
-    #print ('> "%s"' % text), len(text.split()), frac, args
+      bad = True # we're good so far, but words are incomplete
+
+    return not bad
+
+  def get_seed(self):
+    if not self.validate():
+      raise Exception("Electrum seed incomplete")
+    return electrum.mnemonic_decode(self.passphrase.get_text().split())
 
 
 class PluginRow(Gtk.Box):
@@ -71,7 +78,7 @@ class PluginRow(Gtk.Box):
     Gtk.Box.__init__(self, orientation=Gtk.Orientation.HORIZONTAL)
     self.plugin = plugin
     self.props.margin_bottom = 12
-    #label.props.halign = Gtk.Align.START
+    self.focus_widget = None
 
     # switch and expander
     self.switch = Gtk.Switch()
@@ -105,9 +112,12 @@ class PluginRow(Gtk.Box):
     grid = Gtk.Grid()
     for i, field in enumerate(self.plugin.fields):
       entry = field.generate_widget()
+      if i == 0: # first field, set focus
+        self.focus_widget = entry
 
       # make a label for our new widget 
       label = Gtk.Label(field.gui_label)
+      label.set_tooltip_markup(field.tip)
       label.props.margin_right = 12
       label.props.margin_left = 12
       label.props.halign = Gtk.Align.START
@@ -121,10 +131,18 @@ class PluginRow(Gtk.Box):
       if not self.plugin_gui: # create the plugin GUI
         self.create_plugin_gui()
         self.plugin_gui = True
-      # XXX set focus to first field!
       self.expander.set_expanded(True)
+      if self.focus_widget:
+        self.focus_widget.grab_focus()
     else:
       self.expander.set_expanded(False)
+
+  def active(self):
+    return self.switch.get_active()
+
+  def processing(self, start):
+    # would like some kind of feedback here ...
+    # bigger issue is that the plugins are running in the GUI thread ...
 
 
 plugins = [deterministicgpg.Plugin(),
@@ -148,9 +166,9 @@ class MainWindow(Gtk.Window):
     vbox.pack_start(label, False, False, 0)
 
     # add ID passphrase entry (with options show passphrase, generate new ID)
-    pw = PassphraseWidget()
-    pw.props.valign = Gtk.Align.START
-    vbox.pack_start(pw, False, False, 0)
+    self.passphrase = PassphraseWidget()
+    self.passphrase.props.valign = Gtk.Align.START
+    vbox.pack_start(self.passphrase, False, False, 0)
 
     # add ListBox which contains children rows one per plugin with switch to enable/disable
     list_label = Gtk.Label("<b>Select types of IDs to generate</b>", use_markup=True)
@@ -165,20 +183,26 @@ class MainWindow(Gtk.Window):
     listbox.props.valign = Gtk.Align.START
     vbox.pack_start(listbox, True, True, 0)
 
+    self.plugin_widgets = []
     for plugin in plugins:
       pr = PluginRow(plugin)
       pr.props.valign = Gtk.Align.START
       listbox.add(pr)
+      self.plugin_widgets.append(pr)
 
     # add button to create ID for all checked plugins
 
     self.button = Gtk.Button(label="Generate!")
     self.button.valign = Gtk.Align.END
-    #self.button.connect("clicked", self.generate?)
+    self.button.connect("clicked", self.generate)
     vbox.pack_start(self.button, True, True, 0)
 
   def generate(self, widget):
-    print("Stuff ...")
+    for pr in self.plugin_widgets:
+      if pr.active() and pr.plugin.valid():
+        pr.processing(True)
+        pr.plugin.doit(self.passphrase.get_seed())
+        pr.processing(False)
 
 win = MainWindow()
 win.connect("delete-event", Gtk.main_quit)
