@@ -13,6 +13,7 @@ import getpass
 import hashlib
 import electrum
 import subprocess
+import xml.sax.saxutils
 from Crypto.PublicKey import RSA
 
 import plugin
@@ -84,7 +85,14 @@ class Plugin(plugin.Plugin):
     self.fields = [self.name, self.email]
 
   def doit(self, seed):
-    create_gpg_key('"%s" <%s>' % (self.name.value, self.email.value), seed)
+    key_id = '%s <%s>' % (self.name.value, self.email.value)
+    create_gpg_key(key_id, seed)
+    ret = plugin.Return(('GPG key for %s created.  You now need to set the trust level for it in the '
+        'gpg keychain.  You can do this in <a href="seahorse">seahorse</a> or the <a href="gpg">gpg commandline</a>.'
+        ) % xml.sax.saxutils.escape(key_id))
+    ret['seahorse'] = plugin.RetExecLink('seahorse')
+    ret['gpg'] = plugin.RetExecLink("gpg --edit-key '%s'" % key_id, terminal=True)
+    return ret
 
 	
 if __name__ == '__main__':

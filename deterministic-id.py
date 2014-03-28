@@ -1,9 +1,11 @@
 #!/usr/bin/env python
 import sys
+import hashlib
 import electrum
 from gi.repository import Gtk
 
 import plugin
+import name
 import deterministicgpg
 
 class PassphraseWidget(Gtk.Grid):
@@ -70,7 +72,8 @@ class PassphraseWidget(Gtk.Grid):
   def get_seed(self):
     if not self.validate():
       raise Exception("Electrum seed incomplete")
-    return electrum.mnemonic_decode(self.passphrase.get_text().split())
+    # We hash it so a badly designed plugin can't leak information about the electrum key
+    return hashlib.sha512(electrum.mnemonic_decode(self.passphrase.get_text().split())).digest()
 
 
 class PluginRow(Gtk.Box):
@@ -104,6 +107,15 @@ class PluginRow(Gtk.Box):
     label.props.xalign = 0
     label.props.margin_bottom = 6
     self.box.add(label)
+    
+    self.gui = Gtk.Box()
+    self.box.add(self.gui)
+
+    #self.progressbar = Gtk.ProgressBar()
+    #self.progressbar.
+
+    self.result = Gtk.Box()
+    self.box.add(self.result)
 
     # plugin fields don't get done unless the switch gets flipped
     self.plugin_gui = False
@@ -123,7 +135,15 @@ class PluginRow(Gtk.Box):
       label.props.halign = Gtk.Align.START
       grid.attach(label, 0, i, 1, 1)
       grid.attach(entry, 1, i, 1, 1)
-    self.box.add(grid)
+    self.gui.add(grid)
+    self.box.show_all()
+
+  def show_result(self, result):
+    # remove old result
+    for child in self.result.get_children():
+      self.result.remove(child)
+
+    self.result.add(result.generate_widget())
     self.box.show_all()
 
   def on_off(self, *args):
@@ -141,11 +161,14 @@ class PluginRow(Gtk.Box):
     return self.switch.get_active()
 
   def processing(self, start):
+    if start:
+      self.switch.set_sensitive(False) # and we'll never turn it back to true?
+
     # would like some kind of feedback here ...
     # bigger issue is that the plugins are running in the GUI thread ...
 
 
-plugins = [deterministicgpg.Plugin(),
+plugins = [name.Plugin(), deterministicgpg.Plugin(),
     plugin.Plugin("Bar", "Some longer descriptions that is multiple lines.\nSecond line ..."),
     plugin.Plugin('Foo Bar Baz', 'A description <b>with</b> markup, line wrapping, and even a <a href="http://google.com">hyperlink</a>!  Wow!'),
     ]
@@ -201,7 +224,8 @@ class MainWindow(Gtk.Window):
     for pr in self.plugin_widgets:
       if pr.active() and pr.plugin.valid():
         pr.processing(True)
-        pr.plugin.doit(self.passphrase.get_seed())
+        ret = pr.plugin.doit(self.passphrase.get_seed())
+        pr.show_result(ret)
         pr.processing(False)
 
 win = MainWindow()

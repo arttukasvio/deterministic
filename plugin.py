@@ -44,6 +44,48 @@ class UIntField(Field):
     entry.connect('value-changed', handle)
     return entry
 
+
+class Return(dict):
+  """ Usage: ret = Return("Descriptive string <a href="replace">link text</a>")
+             # descriptive string is parsed as markup for Gtk.Label
+             ret['replace'] = ...
+             ret['var'] = ...
+  """
+  def __init__(self, string):
+    dict.__init__(self)
+    self.string = string
+
+  def generate_widget(self):
+    ret = Gtk.Label()
+    ret.set_markup(self.string)
+    ret.set_justify(Gtk.Justification.LEFT)
+    ret.set_selectable(True)
+    ret.props.halign = Gtk.Align.START
+    ret.props.xalign = 0
+    ret.set_line_wrap(True)
+    ret.connect('activate-link', self.link_handler)
+
+    return ret
+
+  def link_handler(self, label, uri):
+    try:
+      self[uri].handle()
+    except:
+      raise
+    return True # link handled
+
+class RetExecLink(object):
+  def __init__(self, command, terminal=False):
+    self.command = command
+    self.terminal = terminal
+
+  def handle(self):
+    import os
+    if self.terminal:
+      os.system('xterm -e %s' % self.command)
+    else:
+      os.system(self.command)
+
 class Plugin(object):
   def __init__(self, title, description):
     self.title = title
