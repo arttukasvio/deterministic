@@ -9,6 +9,7 @@
 # Requirements: pycrypto, monkeysphere, gpg
 
 import os
+import drbg
 import getpass
 import hashlib
 import electrum
@@ -18,50 +19,9 @@ from Crypto.PublicKey import RSA
 
 import plugin
 
-class DeterministicRandom(object):
-  """ Deterministic "random" generator.  May not be best method, but
-        ... seems to be same basic procedure as used in python-ecdsa util.PRNG
-        https://github.com/trezor/python-ecdsa/blob/master/ecdsa/util.py
-        
-      Somewhat inspired by: http://blog.cr.yp.to/20140205-entropy.html
-      Some code from: https://github.com/dlitz/pycrypto/blob/master/lib/Crypto/Random/_UserFriendlyRNG.py
-  """
-
-  def __init__(self, seed):
-    self.closed = False
-    self.seed = seed
-    self.iteration = 0
-    self.data = ""
-
-  def close(self):
-    self.closed = True
-
-  def flush(self):
-    pass
-
-  def read(self, N):
-    """Return N bytes from the RNG."""
-    if self.closed:
-      raise ValueError("I/O operation on closed file")
-    if not isinstance(N, (long, int)):
-      raise TypeError("an integer is required")
-    if N < 0:
-      raise ValueError("cannot read to end of infinite stream")
-
-    # Create the "random" data
-    while len(self.data) < N:
-      self.data += hashlib.sha512(self.seed + str(self.iteration)).digest()
-      self.iteration += 1
-
-    retval = self.data[:N]
-    self.data = self.data[N:]
-    assert len(retval) == N
-
-    return retval
-
 def create_gpg_key(user_id, seed):
   
-  rand = DeterministicRandom(seed)
+  rand = drbg.HMAC_DRBG(seed)
 
   key = RSA.generate(4096, rand.read)
 
@@ -98,7 +58,7 @@ class Plugin(plugin.Plugin):
 if __name__ == '__main__':
   import sys
   if(len(sys.argv) == 2 and sys.argv[1] == 'randomtest'):
-    rand = DeterministicRandom("2")
+    rand = drbg.HMAC_DRBG("2")
     xpm = open('rand.xpm', 'w')
     xpm.write('! XPM2\n')
     xpm.write('1024 1024 2 1\n')
