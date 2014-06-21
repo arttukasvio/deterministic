@@ -1,0 +1,132 @@
+<html>
+<head>
+  <script src="//ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+  <link rel="stylesheet" href="//ajax.googleapis.com/ajax/libs/jqueryui/1.10.4/themes/smoothness/jquery-ui.css" />
+  <script src="//ajax.googleapis.com/ajax/libs/jqueryui/1.10.4/jquery-ui.min.js"></script>
+  <style>
+    #seed .input {
+      width: 100%;
+      font-size: 36pt;
+    }
+    #seed.complete .input {
+      font-size: 12pt;
+      height: 24pt;
+    }
+    #seed.complete h1 {
+      font-size: 14pt;
+    }
+    #seed.complete .progress {
+      display: none;
+    }
+    #seed.error .input {
+      border: solid 2px red;
+    }
+  </style>
+  <script>
+var seed = null;
+var plugins = null;
+var has = {};
+
+function createHTMLforPlugin(id, val) {
+  console.log('CREATING HTML');
+  console.log(val.description);
+  console.log(id, val);
+  $('#'+id).remove();
+  
+  $('#plugins').append(
+      $('<div/>', {id: id})
+        .append($('<h2/>').html(val.name))
+        .append($('<span/>').html(val.description))
+   );
+
+  $.getJSON('/plugins/'+id, {seed: seed}, function(data) {
+      console.log(data);
+      if('result' in data) {
+        $('#'+id).append($('<b/>').html(data.result));
+      }
+      if('provides' in data) {
+        var changed = false;
+        $.each(data.provides, function(k, val){
+          if(!(k in has) || has[k] != val) {
+            changed = true;
+            has[k] = val;
+            console.log(k);
+            console.log(val);
+          } else {
+            console.log('Already have: ' + k)
+          }
+        });
+        if(changed){
+          $.each(plugins, createHTMLforPlugin);
+        }
+      }
+  });
+}
+function loadPlugins() {
+  $.getJSON('/plugins', {}, function(data) {
+    console.log(data);
+    plugins = data;
+    $.each(plugins, createHTMLforPlugin);
+  });
+}
+function updateMnemonic(data) {
+  if('error' in data) {
+    $('#seed').addClass('error');
+    $('#seed .message').text(data.error);
+    $('#seed .progress').progressbar('option', {value: false});
+  }
+  else {
+    $('#seed').removeClass('error');
+    $('#seed .message').text('');
+    if('percent' in data) {
+      $('#seed .progress').progressbar('option', {value: data.percent});
+    }
+    if('seed' in data) {
+      seed = data.seed;
+      loadPlugins();
+      $('#seed').addClass('complete', 500);
+    } else {
+      $('#seed').removeClass('complete', 500);
+    }
+  }
+}
+  </script>
+  <title>Deterministic ID generation</title>
+</head>
+<body>
+  <div id="seed">
+    <h1>Electrum Seed</h1>
+    <textarea class="input"></textarea>
+    <div class="message"></div>
+    <div class="progress"></div>
+    <script>
+      $('#seed .input').autocomplete({
+        select: function(evt, ui) {
+          console.log('Evt:', evt, ' ui:', ui);
+          var words = $('#seed .input').val();
+          var startOfLastWord = words.lastIndexOf(' ') + 1;
+          $('#seed .input').val(words.slice(0, startOfLastWord) + ui.item.value + ' ');
+          return false;
+        },
+        source: function(request, response) {
+          var words = $('#seed .input').val();
+          $.getJSON('/mnemonic', { words: words }, function(data) {
+            console.log(data);
+            updateMnemonic(data);
+            if('matches' in data) {
+              response($.map(data.matches, function(item){return {label: item, value: item}; }));
+            }
+          });
+        },
+        focus: function(evt, ui) { return false; }
+      });
+      $('#seed .progress').progressbar(
+        { max: 100,
+          value: 0 }
+      );
+    </script>
+  </div>
+  <h1>What to generate</h1>
+  <div id="plugins"></div>
+</body>
+</html>
